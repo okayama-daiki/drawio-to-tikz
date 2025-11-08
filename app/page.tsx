@@ -47,7 +47,7 @@ export default function Home() {
       setError(
         err instanceof Error
           ? err.message
-          : "An error occurred during conversion"
+          : "An error occurred during conversion",
       );
       console.error("Conversion error:", err);
     } finally {

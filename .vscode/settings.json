@@ -3,14 +3,17 @@
     "editor.codeActionsOnSave": {
       "source.organizeImports": "never",
       "source.organizeImports.biome": "explicit"
-    }
+    },
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[typescriptreact]": {
     "editor.codeActionsOnSave": {
       "source.organizeImports": "never",
       "source.organizeImports.biome": "explicit"
-    }
+    },
+    "editor.defaultFormatter": "biomejs.biome"
   },
+  "biome.configurationPath": "biome.json",
   "chat.tools.terminal.autoApprove": {
     "bunx biome": true
   },
