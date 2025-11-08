@@ -1,0 +1,24 @@
+{
+  "[typescript]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "never",
+      "source.organizeImports.biome": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "never",
+      "source.organizeImports.biome": "explicit"
+    }
+  },
+  "chat.tools.terminal.autoApprove": {
+    "bunx biome": true
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports": "never",
+    "source.organizeImports.biome": "explicit"
+  },
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": true
+}
