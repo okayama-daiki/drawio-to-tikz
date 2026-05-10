@@ -22,7 +22,14 @@ classifiers = [
   "Topic :: Multimedia :: Graphics :: Editors :: Vector-Based",
   "Topic :: Text Processing :: Markup :: LaTeX",
 ]
-dependencies = ["rich>=15.0", "svg2tikz>=3.3.4", "typer>=0.15"]
+dependencies = [
+  "fastapi>=0.123",
+  "python-multipart>=0.0.20",
+  "rich>=15.0",
+  "svg2tikz>=3.3.4",
+  "typer>=0.15",
+  "uvicorn[standard]>=0.38",
+]
 
 [project.urls]
 Homepage = "https://github.com/daikiokayama/drawio2tikz"
@@ -30,6 +37,7 @@ Issues = "https://github.com/daikiokayama/drawio2tikz/issues"
 
 [project.scripts]
 drawio2tikz = "drawio2tikz.cli:app"
+drawio2tikz-web = "drawio2tikz.web:run"
 
 [dependency-groups]
 dev = ["basedpyright>=1.34.0", "pytest>=9.0", "pytest-cov>=7.1.0", "ruff>=0.8"]

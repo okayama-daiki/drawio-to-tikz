@@ -78,6 +78,24 @@ drawio2tikz path/to/figure.drawio -o output_dir --keep-svg --svg-dir output_dir/
 drawio2tikz --help
 ```
 
+## Web App
+
+Run the FastAPI web UI locally:
+
+```bash
+uv sync
+uv run drawio2tikz-web
+```
+
+Then open <http://localhost:8000>.
+
+The conversion API is available at `POST /api/convert` with multipart form data:
+
+- `file`: `.drawio`, `.drawio.png`, or `.xml` file
+- `page_index`: 1-based page index, default `1`
+- `all_pages`: convert every page, default `false`
+- `keep_svg`: include the sanitized intermediate SVG, default `false`
+
 ## LaTeX Setup
 
 Add these packages to your LaTeX document preamble:
