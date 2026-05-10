@@ -96,6 +96,22 @@ The conversion API is available at `POST /api/convert` with multipart form data:
 - `all_pages`: convert every page, default `false`
 - `keep_svg`: include the sanitized intermediate SVG, default `false`
 
+### Docker
+
+Build and run the web app:
+
+```bash
+docker build -t drawio2tikz .
+docker run --rm -p 8000:8000 drawio2tikz
+```
+
+On Apple Silicon, build the amd64 image because the Dockerfile installs the draw.io Desktop `.deb` package:
+
+```bash
+docker build --platform linux/amd64 -t drawio2tikz .
+docker run --rm --platform linux/amd64 -p 8000:8000 drawio2tikz
+```
+
 ## LaTeX Setup
 
 Add these packages to your LaTeX document preamble:
