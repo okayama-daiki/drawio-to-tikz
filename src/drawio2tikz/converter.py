@@ -9,6 +9,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from os import environ
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>\s*", re.IGNORECASE)
 DOCTYPE_RE = re.compile(r"^\s*<!DOCTYPE[^>]*(?:\[[\s\S]*?\]\s*)?>\s*", re.IGNORECASE)
+DEFAULT_DRAWIO_BIN = environ.get("DRAWIO_BIN", "drawio")
 
 
 @dataclass(frozen=True)
@@ -36,7 +38,7 @@ class ConvertOptions:
     all_pages: bool = False
     keep_svg: bool = False
     svg_dir: Path | None = None
-    drawio_bin: str = "drawio"
+    drawio_bin: str = DEFAULT_DRAWIO_BIN
     output_unit: str = "pt"
     scale: float = 1.0
     round_number: int = 3
