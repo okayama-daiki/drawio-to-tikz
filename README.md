@@ -5,6 +5,7 @@
 ## Features
 
 - Converts either a single draw.io page or all pages
+- Converts multiple draw.io files from the web UI
 - Preserves label colors, bold text, font sizes, and simple line breaks
 - **Ignores draw.io font family names**, allowing output to use the host LaTeX document font
 - Removes draw.io SVG CSS that `svg2tikz` cannot parse, including `light-dark(...)` from draw.io's dark mode color scheme
@@ -91,7 +92,7 @@ Then open <http://localhost:8000>.
 
 The conversion API is available at `POST /api/convert` with multipart form data:
 
-- `file`: `.drawio`, `.drawio.png`, or `.xml` file
+- `file`: one or more `.drawio`, `.drawio.png`, or `.xml` files
 - `page_index`: 1-based page index, default `1`
 - `all_pages`: convert every page, default `false`
 - `keep_svg`: include the sanitized intermediate SVG, default `false`
