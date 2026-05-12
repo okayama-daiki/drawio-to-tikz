@@ -120,6 +120,7 @@ Add these packages to your LaTeX document preamble:
 ```tex
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{amsmath}
 ```
 
 Include the generated TikZ file:
@@ -140,6 +141,7 @@ For support of arbitrary large font sizes, use a scalable font:
 \documentclass{article}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{amsmath}
 \usepackage{mlmodern}
 
 \begin{document}

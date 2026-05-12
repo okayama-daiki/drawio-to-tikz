@@ -23,7 +23,10 @@ RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})")
 FONT_WEIGHT_RE = re.compile(r"font-weight:\s*([^;]+)", re.IGNORECASE)
 DRAWIO_STYLE_FONT_SIZE_RE = re.compile(r"(?:^|;)fontSize=([0-9.]+)(?:;|$)")
-TEX_MATH_SPAN_RE = re.compile(r"(\\\(.*?\\\)|\\\[.*?\\\])")
+TEX_MATH_SPAN_RE = re.compile(
+    r"(\\\(.*?\\\)|\\\[.*?\\\]|\$\$.*?\$\$|(?<!\\)\$(?:\\.|[^$\\])+(?<!\\)\$)",
+    re.DOTALL,
+)
 
 TEX_SPECIALS = {
     "&": r"\&",
@@ -303,10 +306,19 @@ def _escape_tex_text(text: str) -> str:
     offset = 0
     for match in TEX_MATH_SPAN_RE.finditer(text):
         parts.append(_escape_tex_plain_text(text[offset : match.start()]))
-        parts.append(match.group(0))
+        parts.append(_normalize_tex_math_span(match.group(0)))
         offset = match.end()
     parts.append(_escape_tex_plain_text(text[offset:]))
     return "".join(parts)
+
+
+def _normalize_tex_math_span(text: str) -> str:
+    """Normalize dollar-delimited math for safe use inside TikZ text nodes."""
+    if text.startswith("$$") and text.endswith("$$"):
+        return rf"\({text[2:-2]}\)"
+    if text.startswith("$") and text.endswith("$"):
+        return rf"\({text[1:-1]}\)"
+    return text
 
 
 def _escape_tex_plain_text(text: str) -> str:
