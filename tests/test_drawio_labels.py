@@ -60,6 +60,20 @@ def test_parse_math_label_still_escapes_surrounding_text() -> None:
     assert label.lines[0].text == r"a\_b \(x_i\) \{z\}"
 
 
+def test_parse_label_preserves_raw_tex_macro() -> None:
+    r"""Test that raw TeX macro calls (e.g. \hyperlink{...}{...}) are not brace-escaped."""
+    label = parse_label(r"\hyperlink{par:lower-bound-case-2}{\textit{Case 2}}")
+
+    assert label.lines[0].text == r"\hyperlink{par:lower-bound-case-2}{\textit{Case 2}}"
+
+
+def test_parse_label_still_escapes_braces_outside_tex_macros() -> None:
+    """Test that literal braces unrelated to a TeX macro call are still escaped."""
+    label = parse_label("{plain text}")
+
+    assert label.lines[0].text == r"\{plain text\}"
+
+
 def test_parse_css_font_weight() -> None:
     """Test parsing CSS font-weight declarations."""
     label = parse_label('<span style="font-weight: 700;">heavy</span>')

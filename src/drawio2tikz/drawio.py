@@ -23,7 +23,8 @@ RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})")
 FONT_WEIGHT_RE = re.compile(r"font-weight:\s*([^;]+)", re.IGNORECASE)
 DRAWIO_STYLE_FONT_SIZE_RE = re.compile(r"(?:^|;)fontSize=([0-9.]+)(?:;|$)")
-TEX_MATH_SPAN_RE = re.compile(r"(\\\(.*?\\\)|\\\[.*?\\\])")
+TEX_MATH_SPAN_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]")
+TEX_RAW_SPAN_START_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]|\\[a-zA-Z]+")
 
 TEX_SPECIALS = {
     "&": r"\&",
@@ -298,15 +299,57 @@ def _text_from_runs(runs: list[TextRun]) -> str:
 
 
 def _escape_tex_text(text: str) -> str:
-    """Escape TeX text while preserving explicit math spans."""
+    """Escape TeX text while preserving raw TeX syntax (math spans and macro calls)."""
     parts: list[str] = []
     offset = 0
-    for match in TEX_MATH_SPAN_RE.finditer(text):
-        parts.append(_escape_tex_plain_text(text[offset : match.start()]))
-        parts.append(match.group(0))
-        offset = match.end()
+    for start, end in _raw_tex_spans(text):
+        parts.append(_escape_tex_plain_text(text[offset:start]))
+        parts.append(text[start:end])
+        offset = end
     parts.append(_escape_tex_plain_text(text[offset:]))
     return "".join(parts)
+
+
+def _raw_tex_spans(text: str) -> list[tuple[int, int]]:
+    r"""Find spans of literal TeX syntax (math spans, `\command{...}` calls) to leave untouched."""
+    spans: list[tuple[int, int]] = []
+    pos = 0
+    length = len(text)
+    while pos < length:
+        backslash_index = text.find("\\", pos)
+        if backslash_index == -1:
+            break
+        match = TEX_RAW_SPAN_START_RE.match(text, backslash_index)
+        if not match:
+            pos = backslash_index + 1
+            continue
+        end = match.end()
+        if not match.group(0).startswith(("\\(", "\\[")):
+            end = _tex_command_args_end(text, end)
+        spans.append((match.start(), end))
+        pos = end
+    return spans
+
+
+def _tex_command_args_end(text: str, pos: int) -> int:
+    """Extend past any brace-delimited argument groups immediately following a TeX command."""
+    length = len(text)
+    while pos < length and text[pos] == "{":
+        depth = 0
+        index = pos
+        while index < length:
+            if text[index] == "{":
+                depth += 1
+            elif text[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    index += 1
+                    break
+            index += 1
+        else:
+            break  # unbalanced braces; stop extending
+        pos = index
+    return pos
 
 
 def _escape_tex_plain_text(text: str) -> str:
