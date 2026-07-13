@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "drawio2tikz"
-version = "0.4.0"
+version = "0.5.0"
 description = "Convert diagrams.net/draw.io diagrams to TikZ via SVG."
 readme = "README.md"
 authors = [{ name = "Daiki Okayama", email = "lawliet.d.k.m@gmail.com" }]
