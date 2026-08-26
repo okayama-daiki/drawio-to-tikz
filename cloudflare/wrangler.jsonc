@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "drawio2tikz-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-26",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "ORIGIN_URL": "https://drawio2tikz-canfalngpq-an.a.run.app"
+  },
+  "routes": [
+    {
+      "pattern": "drawio2tikz.daiki.dev",
+      "custom_domain": true
+    }
+  ]
+}

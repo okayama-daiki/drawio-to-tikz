@@ -129,6 +129,17 @@ The workflow expects these GitHub Actions repository variables:
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`
 - `GCP_DEPLOY_SERVICE_ACCOUNT`
 
+### Custom domain
+
+The public custom domain is <https://drawio2tikz.daiki.dev>. A small Cloudflare Worker in
+`cloudflare/` streams requests to Cloud Run. Cloudflare manages the DNS record and TLS certificate
+through the Worker Custom Domain declared in `cloudflare/wrangler.jsonc`.
+
+Cloudflare deployment expects these GitHub Actions repository secrets:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
 ## LaTeX Setup
 
 Add these packages to your LaTeX document preamble:

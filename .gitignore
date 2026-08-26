@@ -8,6 +8,7 @@ coverage.out
 .venv/
 .pytest_cache/
 .ruff_cache/
+.wrangler/
 __pycache__/
 *.py[cod]
 
