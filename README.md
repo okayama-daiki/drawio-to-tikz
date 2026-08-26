@@ -5,6 +5,7 @@
 ## Features
 
 - Converts either a single draw.io page or all pages
+- Converts multiple draw.io files from the web UI
 - Preserves label colors, bold text, font sizes, and simple line breaks
 - **Ignores draw.io font family names**, allowing output to use the host LaTeX document font
 - Removes draw.io SVG CSS that `svg2tikz` cannot parse, including `light-dark(...)` from draw.io's dark mode color scheme
@@ -78,6 +79,56 @@ drawio2tikz path/to/figure.drawio -o output_dir --keep-svg --svg-dir output_dir/
 drawio2tikz --help
 ```
 
+## Web App
+
+Run the FastAPI web UI locally:
+
+```bash
+uv sync
+uv run drawio2tikz-web
+```
+
+Then open <http://localhost:8000>.
+
+The conversion API is available at `POST /api/convert` with multipart form data:
+
+- `file`: one or more `.drawio`, `.drawio.png`, or `.xml` files
+- `page_index`: 1-based page index, default `1`
+- `all_pages`: convert every page, default `false`
+- `keep_svg`: include the sanitized intermediate SVG, default `false`
+
+### Docker
+
+Build and run the web app:
+
+```bash
+docker build -t drawio2tikz .
+docker run --rm -p 8000:8000 drawio2tikz
+```
+
+On Apple Silicon, build the amd64 image because the Dockerfile installs the draw.io Desktop `.deb` package:
+
+```bash
+docker build --platform linux/amd64 -t drawio2tikz .
+docker run --rm --platform linux/amd64 -p 8000:8000 drawio2tikz
+```
+
+### Cloud Run deployment
+
+Pushes to `main` run the full CI suite and then deploy the amd64 container to the
+`drawio2tikz` Cloud Run service in `asia-northeast1`. GitHub Actions authenticates with
+Workload Identity Federation, so the repository does not store a Google Cloud service-account
+key.
+
+The deployment keeps Cloud Run at zero minimum instances, one maximum instance, and one
+concurrent request per instance. Artifact Registry cleanup policies retain only the most recent
+container image.
+
+The workflow expects these GitHub Actions repository variables:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_DEPLOY_SERVICE_ACCOUNT`
+
 ## LaTeX Setup
 
 Add these packages to your LaTeX document preamble:
@@ -85,6 +136,7 @@ Add these packages to your LaTeX document preamble:
 ```tex
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{amsmath}
 ```
 
 Include the generated TikZ file:
@@ -105,6 +157,7 @@ For support of arbitrary large font sizes, use a scalable font:
 \documentclass{article}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{amsmath}
 \usepackage{mlmodern}
 
 \begin{document}

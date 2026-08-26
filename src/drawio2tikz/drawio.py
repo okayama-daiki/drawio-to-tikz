@@ -23,8 +23,11 @@ RGB_COLOR_RE = re.compile(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[^)]+)?\)", re.
 HEX_COLOR_RE = re.compile(r"#([0-9a-fA-F]{6})")
 FONT_WEIGHT_RE = re.compile(r"font-weight:\s*([^;]+)", re.IGNORECASE)
 DRAWIO_STYLE_FONT_SIZE_RE = re.compile(r"(?:^|;)fontSize=([0-9.]+)(?:;|$)")
-TEX_MATH_SPAN_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]")
-TEX_RAW_SPAN_START_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]|\\[a-zA-Z]+")
+TEX_MATH_SPAN_RE = re.compile(
+    r"(\\\(.*?\\\)|\\\[.*?\\\]|\$\$.*?\$\$|(?<!\\)\$(?:\\.|[^$\\])+(?<!\\)\$)",
+    re.DOTALL,
+)
+TEX_COMMAND_RE = re.compile(r"\\[a-zA-Z]+")
 
 TEX_SPECIALS = {
     "&": r"\&",
@@ -304,7 +307,7 @@ def _escape_tex_text(text: str) -> str:
     offset = 0
     for start, end in _raw_tex_spans(text):
         parts.append(_escape_tex_plain_text(text[offset:start]))
-        parts.append(text[start:end])
+        parts.append(_normalize_tex_math_span(text[start:end]))
         offset = end
     parts.append(_escape_tex_plain_text(text[offset:]))
     return "".join(parts)
@@ -316,15 +319,14 @@ def _raw_tex_spans(text: str) -> list[tuple[int, int]]:
     pos = 0
     length = len(text)
     while pos < length:
-        backslash_index = text.find("\\", pos)
-        if backslash_index == -1:
+        math_match = TEX_MATH_SPAN_RE.search(text, pos)
+        command_match = TEX_COMMAND_RE.search(text, pos)
+        candidates = [match for match in (math_match, command_match) if match is not None]
+        if not candidates:
             break
-        match = TEX_RAW_SPAN_START_RE.match(text, backslash_index)
-        if not match:
-            pos = backslash_index + 1
-            continue
+        match = min(candidates, key=lambda candidate: (candidate.start(), candidate is command_match))
         end = match.end()
-        if not match.group(0).startswith(("\\(", "\\[")):
+        if match is command_match:
             end = _tex_command_args_end(text, end)
         spans.append((match.start(), end))
         pos = end
@@ -350,6 +352,15 @@ def _tex_command_args_end(text: str, pos: int) -> int:
             break  # unbalanced braces; stop extending
         pos = index
     return pos
+
+
+def _normalize_tex_math_span(text: str) -> str:
+    """Normalize dollar-delimited math for safe use inside TikZ text nodes."""
+    if text.startswith("$$") and text.endswith("$$"):
+        return rf"\({text[2:-2]}\)"
+    if text.startswith("$") and text.endswith("$"):
+        return rf"\({text[1:-1]}\)"
+    return text
 
 
 def _escape_tex_plain_text(text: str) -> str:

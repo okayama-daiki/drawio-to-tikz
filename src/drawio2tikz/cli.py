@@ -11,7 +11,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from .converter import ConvertOptions, convert
+from .converter import DEFAULT_DRAWIO_BIN, ConvertOptions, convert
 
 app = typer.Typer(
     add_completion=False,
@@ -56,7 +56,7 @@ def main(
     drawio_bin: Annotated[
         str,
         typer.Option("--drawio-bin", help="draw.io CLI executable."),
-    ] = "drawio",
+    ] = DEFAULT_DRAWIO_BIN,
     output_unit: Annotated[
         str,
         typer.Option("--output-unit", help="Output unit passed to svg2tikz."),

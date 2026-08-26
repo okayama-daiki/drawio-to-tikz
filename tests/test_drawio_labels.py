@@ -54,6 +54,22 @@ def test_parse_math_label_preserves_tex_syntax() -> None:
     )
 
 
+def test_parse_display_math_label_preserves_tex_syntax() -> None:
+    """Test normalizing display math labels without escaping TeX syntax."""
+    label = parse_label(r'<span style="font-size: 20px;">$$\text{MLG}(P_1)$$</span>')
+
+    assert label.lines[0].text == (
+        r"\fontsize{15.0pt}{18.0pt}\selectfont \(\text{MLG}(P_1)\)"
+    )
+
+
+def test_parse_inline_dollar_math_preserves_tex_syntax() -> None:
+    """Test normalizing inline dollar math while escaping surrounding text."""
+    label = parse_label(r"value_a $G_1$ {note}")
+
+    assert label.lines[0].text == r"value\_a \(G_1\) \{note\}"
+
+
 def test_parse_math_label_still_escapes_surrounding_text() -> None:
     """Test escaping normal text while preserving inline math spans."""
     label = parse_label(r"a_b \(x_i\) {z}")
