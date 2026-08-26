@@ -140,7 +140,8 @@ The workflow expects these GitHub Actions repository variables:
 
 The public custom domain is <https://drawio2tikz.daiki.dev>. A small Cloudflare Worker in
 `cloudflare/` streams requests to Cloud Run. Cloudflare manages the DNS record and TLS certificate
-through the Worker Custom Domain declared in `cloudflare/wrangler.jsonc`.
+through a Worker Custom Domain configured once in the Cloudflare dashboard. The domain is
+intentionally not declared in `cloudflare/wrangler.jsonc`, so CI cannot modify zone routes.
 
 Cloudflare deployment expects these GitHub Actions repository secrets:
 
@@ -148,10 +149,10 @@ Cloudflare deployment expects these GitHub Actions repository secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `ORIGIN_AUTH_TOKEN`
 
-The Cloudflare token needs only `Account / Workers Scripts / Edit` for the selected account and
-`Zone / Workers Routes / Edit` for the `daiki.dev` zone. The origin token is installed as a
-Cloudflare Worker secret and a Cloud Run Secret Manager reference. Direct requests to the public
-`run.app` URL are rejected without that header.
+The Cloudflare token needs only `Account / Workers Scripts / Edit` for the selected account; it
+needs no zone permission. The origin token is installed as a Cloudflare Worker secret and a Cloud
+Run Secret Manager reference. Direct requests to the public `run.app` URL are rejected without
+that header.
 
 ## Security
 

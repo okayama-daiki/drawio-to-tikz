@@ -7,11 +7,5 @@
   "preview_urls": false,
   "vars": {
     "ORIGIN_URL": "https://drawio2tikz-canfalngpq-an.a.run.app"
-  },
-  "routes": [
-    {
-      "pattern": "drawio2tikz.daiki.dev",
-      "custom_domain": true
-    }
-  ]
+  }
 }
