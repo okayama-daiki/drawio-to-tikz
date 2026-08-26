@@ -6,7 +6,6 @@ import base64
 import binascii
 import re
 import urllib.parse
-# The standard module supplies types only; untrusted parsing uses defusedxml below.
 import xml.etree.ElementTree as ET  # nosec B405
 import zlib
 from dataclasses import dataclass, replace
@@ -14,6 +13,8 @@ from html.parser import HTMLParser
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as DefusedET
+
+# The standard module supplies XML types only; untrusted parsing uses defusedxml.
 
 if TYPE_CHECKING:
     from pathlib import Path

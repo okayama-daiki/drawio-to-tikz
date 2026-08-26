@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import shutil
-# The draw.io CLI is the intended process boundary.
 import subprocess  # nosec B404
 import sys
 import tempfile
@@ -18,6 +17,8 @@ from svg2tikz import convert_svg
 
 from .drawio import count_pages, drawio_stem, parse_labels
 from .svg import sanitize_svg
+
+# The draw.io CLI is the intended process boundary.
 
 if TYPE_CHECKING:
     from collections.abc import Generator
