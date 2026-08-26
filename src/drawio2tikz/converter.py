@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 
 XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>\s*", re.IGNORECASE)
 DOCTYPE_RE = re.compile(r"^\s*<!DOCTYPE[^>]*(?:\[[\s\S]*?\]\s*)?>\s*", re.IGNORECASE)
+CENTERED_TEXT_NODE_RE = re.compile(
+    r"(\\node\[)([^\]]*\banchor=)south"
+    r"(\b[^\]]*\]\s*\(drawio2tikzcenter\d+line\d+\))",
+)
 
 
 @dataclass(frozen=True)
@@ -163,7 +167,7 @@ def _convert_svg_source(svg_source: str, options: ConvertOptions) -> str:
             scale=options.scale,
             round_number=options.round_number,
         )
-        return result
+        return CENTERED_TEXT_NODE_RE.sub(r"\1\2center\3", result)
 
 
 def _strip_xml_prolog(svg_source: str) -> str:

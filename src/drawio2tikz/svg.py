@@ -15,10 +15,16 @@ if TYPE_CHECKING:
 STYLE_ELEMENT_RE = re.compile(r"<style\b[^>]*>.*?</style>", re.DOTALL)
 STYLE_ATTR_RE = re.compile(r'\sstyle="[^"]*"')
 SWITCH_FOREIGN_OBJECT_RE = re.compile(
-    r"<switch>\s*<foreignObject\b.*?</foreignObject>\s*<image\s+([^>]*)/>\s*</switch>",
+    r"<switch>\s*<foreignObject\b[^>]*>(.*?)</foreignObject>\s*"
+    r"<image\s+([^>]*)/>\s*</switch>",
     re.DOTALL,
 )
 ATTR_RE = re.compile(r'([:\w-]+)="([^"]*)"')
+FLEX_CONTAINER_STYLE_RE = re.compile(
+    r'<div\b[^>]*\bstyle="([^"]*\bdisplay:\s*flex\b[^"]*)"',
+    re.IGNORECASE,
+)
+CSS_LENGTH_RE_TEMPLATE = r"(?:^|;)\s*{property}:\s*([-+]?[0-9.]+)px(?:;|$)"
 
 
 @dataclass(frozen=True)
@@ -51,13 +57,21 @@ def _restore_foreign_object_text(
     labels: dict[str, Label],
 ) -> str:
     """Restore text in foreign objects using parsed labels."""
+    label_serial = 0
 
     def replace(match: re.Match[str]) -> str:
+        nonlocal label_serial
         cell_id = _nearest_cell_id(svg_text, match.start())
         if not cell_id or cell_id not in labels:
             return match.group(0)
         label_obj = labels[cell_id]
-        replacement = _text_svg_for_label(label_obj, _parse_attrs(match.group(1)))
+        replacement = _text_svg_for_label(
+            label_obj,
+            _parse_attrs(match.group(2)),
+            match.group(1),
+            label_serial,
+        )
+        label_serial += 1
         return replacement or match.group(0)
 
     return SWITCH_FOREIGN_OBJECT_RE.sub(replace, svg_text)
@@ -81,7 +95,12 @@ def _parse_attrs(raw_attrs: str) -> dict[str, str]:
     return {name: html.unescape(value) for name, value in ATTR_RE.findall(raw_attrs)}
 
 
-def _text_svg_for_label(label: Label, image_attrs: dict[str, str]) -> str:
+def _text_svg_for_label(
+    label: Label,
+    image_attrs: dict[str, str],
+    foreign_object_body: str,
+    label_serial: int,
+) -> str:
     """Generate SVG text nodes for a label."""
     try:
         x = float(image_attrs["x"])
@@ -97,18 +116,53 @@ def _text_svg_for_label(label: Label, image_attrs: dict[str, str]) -> str:
     font_size = label.font_size or height / len(label.lines) * 0.8
     font_size = max(8.0, min(font_size, height * 0.95))
     line_height = font_size * 1.2
-    first_baseline = y + height / 2 - (len(label.lines) - 1) * line_height / 2 + font_size * 0.35
     cx = x + width / 2
+    vertical_center = _flex_vertical_center(foreign_object_body)
+
+    if vertical_center is None:
+        first_y = y + height / 2 - (len(label.lines) - 1) * line_height / 2 + font_size * 0.35
+        node_id_prefix = f"drawio2tikzlabel{label_serial}line"
+    else:
+        first_y = vertical_center - (len(label.lines) - 1) * line_height / 2
+        # svg2tikz interprets SVG's y coordinate as the south edge of a TeX
+        # node.  Mark labels whose y coordinate is a true visual center so the
+        # converter can replace that vertical anchor after SVG conversion.
+        node_id_prefix = f"drawio2tikzcenter{label_serial}line"
 
     text_nodes: list[str] = []
     for index, line in enumerate(label.lines):
         line_text = _line_text_with_fallback_size(line, font_size)
+        node_id = f' id="{node_id_prefix}{index}"'
         text_nodes.append(
-            f'<text x="{cx:.3f}" y="{first_baseline + index * line_height:.3f}" '
+            f'<text{node_id} x="{cx:.3f}" y="{first_y + index * line_height:.3f}" '
             f'text-anchor="middle" font-size="{font_size:.3f}px">'
             f"{html.escape(line_text, quote=False)}</text>",
         )
     return "".join(text_nodes)
+
+
+def _flex_vertical_center(foreign_object_body: str) -> float | None:
+    """Return draw.io's exact vertical center for flex-centered labels."""
+    match = FLEX_CONTAINER_STYLE_RE.search(foreign_object_body)
+    if not match:
+        return None
+
+    style = html.unescape(match.group(1))
+    normalized_style = re.sub(r"\s+", " ", style).strip()
+    if not re.search(
+        r"(?:^|;)\s*align-items:\s*(?:unsafe\s+)?center(?:;|$)",
+        normalized_style,
+        re.IGNORECASE,
+    ):
+        return None
+
+    padding_top_re = re.compile(
+        CSS_LENGTH_RE_TEMPLATE.format(property="padding-top"),
+        re.IGNORECASE,
+    )
+    if padding_top := padding_top_re.search(normalized_style):
+        return float(padding_top.group(1))
+    return None
 
 
 def _line_text_with_fallback_size(line: LabelLine, font_size_px: float) -> str:
