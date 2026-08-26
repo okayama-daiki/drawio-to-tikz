@@ -18,19 +18,6 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential \
-        libgirepository-2.0-dev \
-        libgirepository1.0-dev \
-        libcairo2-dev \
-        libglib2.0-dev \
-        libjpeg-dev \
-        libxml2-dev \
-        libxslt1-dev \
-        pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY pyproject.toml README.md LICENSE uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
