@@ -149,6 +149,7 @@ jobs:
                       --memory=1Gi
                       --timeout=300s
                       --cpu-throttling
+                      --no-cpu-boost
 
             - name: Verify deployment
               run: curl --fail --show-error --silent --retry 10 --retry-delay 5 "${{ steps.deploy.outputs.url }}/health"
