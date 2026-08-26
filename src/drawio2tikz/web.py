@@ -4,23 +4,48 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import tempfile
 from importlib.metadata import version as package_version
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .converter import DEFAULT_DRAWIO_BIN, ConversionResult, ConvertOptions, convert
 from .drawio import drawio_stem
 
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
 type UploadedDiagram = tuple[bytes, str]
 
 MAX_UPLOAD_BYTES = int(os.environ.get("DRAWIO2TIKZ_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+MAX_TOTAL_UPLOAD_BYTES = int(
+    os.environ.get("DRAWIO2TIKZ_MAX_TOTAL_UPLOAD_BYTES", str(20 * 1024 * 1024))
+)
+MAX_UPLOAD_FILES = int(os.environ.get("DRAWIO2TIKZ_MAX_UPLOAD_FILES", "10"))
+MAX_REQUEST_BYTES = MAX_TOTAL_UPLOAD_BYTES + 1024 * 1024
+ORIGIN_AUTH_HEADER = "X-Drawio2Tikz-Origin-Token"
+ORIGIN_AUTH_TOKEN = os.environ.get("ORIGIN_AUTH_TOKEN", "")
+REQUIRE_ORIGIN_AUTH = os.environ.get("DRAWIO2TIKZ_REQUIRE_ORIGIN_AUTH", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        "DRAWIO2TIKZ_ALLOWED_HOSTS",
+        "drawio2tikz.daiki.dev,*.run.app,localhost,127.0.0.1,testserver",
+    ).split(",")
+    if host.strip()
+]
 ALLOWED_SUFFIXES = {".drawio", ".xml"}
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 UNSAFE_FILENAME_CHARS_RE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -37,6 +62,70 @@ app = FastAPI(
     summary="Convert diagrams.net/draw.io files to TikZ via SVG.",
     version=package_version("drawio2tikz"),
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+
+if REQUIRE_ORIGIN_AUTH and not ORIGIN_AUTH_TOKEN:
+    msg = "ORIGIN_AUTH_TOKEN is required when origin authentication is enabled."
+    raise RuntimeError(msg)
+
+
+@app.middleware("http")
+async def protect_origin_and_add_security_headers(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Authenticate the edge proxy and attach browser security headers."""
+    if REQUIRE_ORIGIN_AUTH and not secrets.compare_digest(
+        request.headers.get(ORIGIN_AUTH_HEADER, ""),
+        ORIGIN_AUTH_TOKEN,
+    ):
+        return _add_security_headers(
+            JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Forbidden"},
+            ),
+            request,
+        )
+
+    if content_length := request.headers.get("content-length"):
+        try:
+            if int(content_length) > MAX_REQUEST_BYTES:
+                return _add_security_headers(
+                    JSONResponse(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        content={"detail": "Request body is too large."},
+                    ),
+                    request,
+                )
+        except ValueError:
+            return _add_security_headers(
+                JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"detail": "Invalid Content-Length header."},
+                ),
+                request,
+            )
+
+    response = await call_next(request)
+    return _add_security_headers(response, request)
+
+
+def _add_security_headers(response: Response, request: Request) -> Response:
+    """Apply the browser policy to success and middleware error responses."""
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; base-uri 'none'; connect-src 'self'; "
+        "form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; "
+        "script-src 'unsafe-inline'; style-src 'unsafe-inline'"
+    )
+    response.headers["Permissions-Policy"] = (
+        "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+    )
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 class ConversionFile(BaseModel):
@@ -101,10 +190,23 @@ async def convert_api(
     markings: Annotated[str, Form()] = "interpret",
 ) -> ConversionResponse:
     """Convert uploaded draw.io files to TikZ."""
+    if len(file) > MAX_UPLOAD_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Upload at most {MAX_UPLOAD_FILES} files per request.",
+        )
+
     uploads: list[UploadedDiagram] = []
+    total_upload_bytes = 0
     for upload in file:
         filename = _safe_filename(upload.filename)
         payload = await _read_upload(upload)
+        total_upload_bytes += len(payload)
+        if total_upload_bytes > MAX_TOTAL_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"Combined uploads must be {MAX_TOTAL_UPLOAD_BYTES} bytes or smaller.",
+            )
         _validate_upload_payload(payload, filename)
         uploads.append((payload, filename))
 
@@ -129,7 +231,7 @@ async def _read_upload(file: UploadFile) -> bytes:
     payload = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(payload) > MAX_UPLOAD_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"Uploaded file must be {MAX_UPLOAD_BYTES} bytes or smaller.",
         )
     if not payload:
@@ -264,7 +366,7 @@ def _convert_payloads(
             except Exception as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=str(exc),
+                    detail="Conversion failed.",
                 ) from exc
 
         return ConversionResponse(
@@ -286,9 +388,11 @@ def run() -> None:
     """Run the web server."""
     uvicorn.run(
         "drawio2tikz.web:app",
-        host=os.environ.get("HOST", "0.0.0.0"),  # noqa: S104
+        # Cloud Run requires listening on every interface inside the container.
+        host=os.environ.get("HOST", "0.0.0.0"),  # noqa: S104  # nosec B104
         port=int(os.environ.get("PORT", "8000")),
         reload=os.environ.get("RELOAD", "").lower() in {"1", "true", "yes"},
+        server_header=False,
     )
 
 

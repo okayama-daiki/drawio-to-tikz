@@ -1,6 +1,6 @@
 """Tests for the FastAPI web helpers."""
 
-# pyright: reportPrivateUsage=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import HTTPException, UploadFile, status
+from fastapi.testclient import TestClient
 
 import drawio2tikz.web
 from drawio2tikz.converter import ConversionResult
@@ -151,3 +152,89 @@ def test_convert_api_accepts_multiple_upload_files(monkeypatch: pytest.MonkeyPat
     )
 
     assert [file.filename for file in response.files] == ["one.tex", "two.tex"]
+
+
+def test_security_headers_are_added() -> None:
+    """Browser-facing responses include a restrictive baseline policy."""
+    response = TestClient(drawio2tikz.web.app).get("/health")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+
+
+def test_origin_auth_rejects_missing_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The public Cloud Run origin rejects requests that bypass Cloudflare."""
+    monkeypatch.setattr(drawio2tikz.web, "REQUIRE_ORIGIN_AUTH", True)
+    monkeypatch.setattr(drawio2tikz.web, "ORIGIN_AUTH_TOKEN", "expected-secret")
+
+    response = TestClient(drawio2tikz.web.app).get("/health")
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_origin_auth_accepts_matching_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cloudflare can reach the protected origin using the shared secret."""
+    monkeypatch.setattr(drawio2tikz.web, "REQUIRE_ORIGIN_AUTH", True)
+    monkeypatch.setattr(drawio2tikz.web, "ORIGIN_AUTH_TOKEN", "expected-secret")
+
+    response = TestClient(drawio2tikz.web.app).get(
+        "/health",
+        headers={drawio2tikz.web.ORIGIN_AUTH_HEADER: "expected-secret"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_convert_api_rejects_too_many_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A request cannot start an unbounded number of conversions."""
+    monkeypatch.setattr(drawio2tikz.web, "MAX_UPLOAD_FILES", 1)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            convert_api(
+                [
+                    UploadFile(filename="one.drawio", file=BytesIO(b"<mxfile />")),
+                    UploadFile(filename="two.drawio", file=BytesIO(b"<mxfile />")),
+                ],
+                1,
+                all_pages=False,
+                keep_svg=False,
+                output_unit="pt",
+                scale=1.0,
+                round_number=3,
+                texmode="raw",
+                markings="interpret",
+            ),
+        )
+
+    assert exc_info.value.status_code == status.HTTP_413_CONTENT_TOO_LARGE
+
+
+def test_convert_api_rejects_large_combined_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Individually small files cannot exceed the aggregate upload limit."""
+    monkeypatch.setattr(drawio2tikz.web, "MAX_TOTAL_UPLOAD_BYTES", 20)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            convert_api(
+                [
+                    UploadFile(filename="one.drawio", file=BytesIO(b"<mxfile />")),
+                    UploadFile(filename="two.drawio", file=BytesIO(b"<mxfile />")),
+                    UploadFile(filename="three.drawio", file=BytesIO(b"<mxfile />")),
+                ],
+                1,
+                all_pages=False,
+                keep_svg=False,
+                output_unit="pt",
+                scale=1.0,
+                round_number=3,
+                texmode="raw",
+                markings="interpret",
+            ),
+        )
+
+    assert exc_info.value.status_code == status.HTTP_413_CONTENT_TOO_LARGE

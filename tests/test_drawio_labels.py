@@ -7,11 +7,14 @@ import urllib.parse
 import zlib
 from typing import TYPE_CHECKING
 
+import drawio2tikz.drawio
 from drawio2tikz.drawio import Label, LabelLine, parse_label, parse_labels
 from drawio2tikz.svg import _restore_foreign_object_text  # pyright: ignore[reportPrivateUsage]
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 
 def test_parse_mixed_formatting() -> None:
@@ -58,9 +61,7 @@ def test_parse_display_math_label_preserves_tex_syntax() -> None:
     """Test normalizing display math labels without escaping TeX syntax."""
     label = parse_label(r'<span style="font-size: 20px;">$$\text{MLG}(P_1)$$</span>')
 
-    assert label.lines[0].text == (
-        r"\fontsize{15.0pt}{18.0pt}\selectfont \(\text{MLG}(P_1)\)"
-    )
+    assert label.lines[0].text == (r"\fontsize{15.0pt}{18.0pt}\selectfont \(\text{MLG}(P_1)\)")
 
 
 def test_parse_inline_dollar_math_preserves_tex_syntax() -> None:
@@ -141,9 +142,7 @@ def test_parse_mxcell_style_font_size(tmp_path: Path) -> None:
 
     labels = parse_labels(drawio_path)
 
-    assert labels["cell-1"].lines[0].text == (
-        r"\fontsize{24.0pt}{28.8pt}\selectfont Sized label"
-    )
+    assert labels["cell-1"].lines[0].text == (r"\fontsize{24.0pt}{28.8pt}\selectfont Sized label")
 
 
 def test_parse_object_wrapped_style_font_size(tmp_path: Path) -> None:
@@ -186,6 +185,20 @@ def test_parse_compressed_diagram_label(tmp_path: Path) -> None:
     labels = parse_labels(drawio_path)
 
     assert labels["cell-1"].lines[0].text == "Compressed label"
+
+
+def test_compressed_diagram_respects_decompressed_size_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A small compressed payload cannot expand without a fixed upper bound."""
+    monkeypatch.setattr(drawio2tikz.drawio, "MAX_DECOMPRESSED_DIAGRAM_BYTES", 128)
+    compressed = _compress_diagram("<mxGraphModel>" + ("A" * 4096) + "</mxGraphModel>")
+
+    result = drawio2tikz.drawio._decompress_diagram_text(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        compressed
+    )
+
+    assert result is None
 
 
 def test_restore_centered_label_uses_drawio_shape_center() -> None:

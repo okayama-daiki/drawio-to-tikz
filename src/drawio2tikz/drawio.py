@@ -6,16 +6,20 @@ import base64
 import binascii
 import re
 import urllib.parse
-import xml.etree.ElementTree as ET
+# The standard module supplies types only; untrusted parsing uses defusedxml below.
+import xml.etree.ElementTree as ET  # nosec B405
 import zlib
 from dataclasses import dataclass, replace
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree as DefusedET
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 DRAWIO_PX_TO_TEX_PT = 0.75
+MAX_DECOMPRESSED_DIAGRAM_BYTES = 20 * 1024 * 1024
 BOLD_FONT_WEIGHT_MIN = 600
 FONT_SIZE_RE = re.compile(r"font-size:\s*([0-9.]+)px", re.IGNORECASE)
 CSS_COLOR_RE = re.compile(r"color:\s*([^;]+)", re.IGNORECASE)
@@ -152,7 +156,10 @@ class DrawioLabelParser(HTMLParser):
 
 def parse_labels(path: Path) -> dict[str, Label]:
     """Parse all labels from a draw.io file."""
-    root = ET.parse(path).getroot()  # noqa: S314
+    root = DefusedET.parse(path).getroot()
+    if root is None:
+        msg = "XML document has no root element"
+        raise ET.ParseError(msg)
     labels: dict[str, Label] = {}
 
     _collect_labels(root, labels)
@@ -214,7 +221,7 @@ def _diagram_root_from_text(text: str) -> ET.Element | None:
     if not xml_text:
         return None
     try:
-        return ET.fromstring(xml_text)  # noqa: S314
+        return DefusedET.fromstring(xml_text)
     except ET.ParseError:
         return None
 
@@ -228,9 +235,20 @@ def _decompress_diagram_text(text: str) -> str | None:
 
     for window_bits in (-zlib.MAX_WBITS, zlib.MAX_WBITS):
         try:
-            inflated = zlib.decompress(compressed, window_bits)
+            decompressor = zlib.decompressobj(window_bits)
+            inflated = decompressor.decompress(
+                compressed,
+                MAX_DECOMPRESSED_DIAGRAM_BYTES + 1,
+            )
+            if len(inflated) > MAX_DECOMPRESSED_DIAGRAM_BYTES or decompressor.unconsumed_tail:
+                return None
+            inflated += decompressor.flush(
+                MAX_DECOMPRESSED_DIAGRAM_BYTES + 1 - len(inflated),
+            )
         except zlib.error:
             continue
+        if len(inflated) > MAX_DECOMPRESSED_DIAGRAM_BYTES or not decompressor.eof:
+            return None
         try:
             return urllib.parse.unquote(inflated.decode("utf-8"))
         except UnicodeDecodeError:
@@ -240,7 +258,10 @@ def _decompress_diagram_text(text: str) -> str | None:
 
 def count_pages(path: Path) -> int:
     """Count the number of pages in a draw.io file."""
-    root = ET.parse(path).getroot()  # noqa: S314
+    root = DefusedET.parse(path).getroot()
+    if root is None:
+        msg = "XML document has no root element"
+        raise ET.ParseError(msg)
     return len(root.findall("diagram"))
 
 
@@ -324,7 +345,9 @@ def _raw_tex_spans(text: str) -> list[tuple[int, int]]:
         candidates = [match for match in (math_match, command_match) if match is not None]
         if not candidates:
             break
-        match = min(candidates, key=lambda candidate: (candidate.start(), candidate is command_match))
+        match = min(
+            candidates, key=lambda candidate: (candidate.start(), candidate is command_match)
+        )
         end = match.end()
         if match is command_match:
             end = _tex_command_args_end(text, end)

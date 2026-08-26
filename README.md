@@ -124,6 +124,13 @@ The deployment keeps Cloud Run at zero minimum instances, one maximum instance, 
 concurrent request per instance. After Cloud Run imports the image, CI deletes the temporary
 Artifact Registry copy; a one-day cleanup policy handles interrupted runs as a fallback.
 
+Cloud Run uses the dedicated `drawio2tikz-runtime` service account. It has no project-level role
+and can access only the `drawio2tikz-origin-auth` Secret Manager secret. The GitHub deployer is
+restricted to updating the existing Cloud Run service, pushing/deleting transient images in the
+single Artifact Registry repository, and acting as that runtime service account. Its Workload
+Identity Federation trust is limited to this repository's immutable GitHub ID and the `main`
+branch.
+
 The workflow expects these GitHub Actions repository variables:
 
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`
@@ -139,6 +146,23 @@ Cloudflare deployment expects these GitHub Actions repository secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
+- `ORIGIN_AUTH_TOKEN`
+
+The Cloudflare token needs only `Account / Workers Scripts / Edit` for the selected account and
+`Zone / Workers Routes / Edit` for the `daiki.dev` zone. The origin token is installed as a
+Cloudflare Worker secret and a Cloud Run Secret Manager reference. Direct requests to the public
+`run.app` URL are rejected without that header.
+
+## Security
+
+The web service limits each upload to 10 MiB, combined uploads to 20 MiB, requests to 10 files,
+draw.io documents to 50 pages, decompressed diagram XML to 20 MiB, and draw.io export processes to
+120 seconds. XML parsing disables DTD and entity expansion. Browser responses carry a restrictive
+content security policy and related security headers.
+
+The generated TikZ intentionally preserves raw TeX entered in draw.io labels. Treat output from
+untrusted diagrams as untrusted source code: inspect it before compiling and do not enable TeX
+shell escape for untrusted output.
 
 ## LaTeX Setup
 

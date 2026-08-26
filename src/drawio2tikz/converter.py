@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
+# The draw.io CLI is the intended process boundary.
+import subprocess  # nosec B404
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -30,6 +31,8 @@ CENTERED_TEXT_NODE_RE = re.compile(
     r"(\b[^\]]*\]\s*\(drawio2tikzcenter\d+line\d+\))",
 )
 DEFAULT_DRAWIO_BIN = environ.get("DRAWIO_BIN", "drawio")
+DRAWIO_EXPORT_TIMEOUT_SECONDS = float(environ.get("DRAWIO_EXPORT_TIMEOUT_SECONDS", "120"))
+MAX_PAGE_COUNT = int(environ.get("DRAWIO2TIKZ_MAX_PAGE_COUNT", "50"))
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,9 @@ def _page_indexes(options: ConvertOptions) -> list[int]:
     page_count = count_pages(options.input_path)
     if page_count == 0:
         msg = "--all-pages needs a plain .drawio XML file with diagram pages."
+        raise RuntimeError(msg)
+    if page_count > MAX_PAGE_COUNT:
+        msg = f"Input contains {page_count} pages; the limit is {MAX_PAGE_COUNT}."
         raise RuntimeError(msg)
     return list(range(1, page_count + 1))
 
@@ -149,7 +155,12 @@ def _run_drawio_export(options: ConvertOptions, page_index: int, raw_svg: Path) 
     if not options.quiet:
         sys.stdout.write(f"+ {' '.join(command)}\n")
         sys.stdout.flush()
-    subprocess.run(command, check=True)  # noqa: S603
+    # This is an argument list and is never passed through a shell.
+    subprocess.run(  # noqa: S603  # nosec B603
+        command,
+        check=True,
+        timeout=DRAWIO_EXPORT_TIMEOUT_SECONDS,
+    )
 
 
 def _convert_svg_source(svg_source: str, options: ConvertOptions) -> str:
