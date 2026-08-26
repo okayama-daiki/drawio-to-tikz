@@ -171,11 +171,18 @@ jobs:
             - name: Verify deployment
               env:
                   ORIGIN_AUTH_TOKEN: ${{ secrets.ORIGIN_AUTH_TOKEN }}
-              run: >-
-                  curl --fail --show-error --silent
-                  --retry 10 --retry-delay 5
-                  --header "X-Drawio2Tikz-Origin-Token: ${ORIGIN_AUTH_TOKEN}"
-                  "${{ steps.deploy.outputs.url }}/health"
+              run: |
+                  curl --fail --show-error --silent \
+                    --retry 10 --retry-delay 5 \
+                    --header "X-Drawio2Tikz-Origin-Token: ${ORIGIN_AUTH_TOKEN}" \
+                    "${{ steps.deploy.outputs.url }}/health"
+
+                  curl --fail-with-body --show-error --silent \
+                    --header "X-Drawio2Tikz-Origin-Token: ${ORIGIN_AUTH_TOKEN}" \
+                    --form "file=@example/sample.drawio;type=application/xml" \
+                    "${{ steps.deploy.outputs.url }}/api/convert" \
+                    | jq --exit-status '.files | length == 1 and .[0].filename == "sample.tex"' \
+                    >/dev/null
 
             - name: Delete transient container image
               if: ${{ always() && steps.build_image.outcome == 'success' }}

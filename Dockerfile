@@ -69,6 +69,7 @@ COPY --from=drawio-package /tmp/drawio.deb /tmp/drawio.deb
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
+        libasound2t64 \
         libcairo2 \
         libgirepository-1.0-1 \
         libgirepository-2.0-0 \
