@@ -121,8 +121,8 @@ Workload Identity Federation, so the repository does not store a Google Cloud se
 key.
 
 The deployment keeps Cloud Run at zero minimum instances, one maximum instance, and one
-concurrent request per instance. Artifact Registry cleanup policies retain only the most recent
-container image.
+concurrent request per instance. After Cloud Run imports the image, CI deletes the temporary
+Artifact Registry copy; a one-day cleanup policy handles interrupted runs as a fallback.
 
 The workflow expects these GitHub Actions repository variables:
 
