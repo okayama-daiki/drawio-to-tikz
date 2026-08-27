@@ -59,23 +59,23 @@ def main(
     ] = DEFAULT_DRAWIO_BIN,
     output_unit: Annotated[
         str,
-        typer.Option("--output-unit", help="Output unit passed to svg2tikz."),
+        typer.Option("--output-unit", help="TikZ coordinate unit: pt, mm, cm, in, or px."),
     ] = "pt",
     scale: Annotated[
         float,
-        typer.Option("--scale", help="Scale passed to svg2tikz."),
+        typer.Option("--scale", help="Global TikZ picture scale."),
     ] = 1.0,
     round_number: Annotated[
         int,
-        typer.Option("--round-number", min=0, help="Coordinate precision for svg2tikz."),
+        typer.Option("--round-number", min=0, help="TikZ coordinate precision."),
     ] = 3,
     texmode: Annotated[
         str,
-        typer.Option("--texmode", help="svg2tikz text mode. raw preserves injected TeX labels."),
+        typer.Option("--texmode", help="Text mode. raw preserves injected TeX labels."),
     ] = "raw",
     markings: Annotated[
         str,
-        typer.Option("--markings", help="svg2tikz marker handling."),
+        typer.Option("--markings", help="Deprecated compatibility option."),
     ] = "interpret",
     quiet: Annotated[
         bool,

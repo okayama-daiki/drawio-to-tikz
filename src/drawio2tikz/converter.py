@@ -7,30 +7,22 @@ import shutil
 import subprocess  # nosec B404
 import sys
 import tempfile
-from contextlib import contextmanager
 from dataclasses import dataclass
 from os import environ
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from svg2tikz import convert_svg
-
 from .drawio import count_pages, drawio_stem, parse_labels
 from .svg import sanitize_svg
+from .tikz import convert_svg_to_tikz
 
 # The draw.io CLI is the intended process boundary.
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-
     from .drawio import Label
 
 XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>\s*", re.IGNORECASE)
 DOCTYPE_RE = re.compile(r"^\s*<!DOCTYPE[^>]*(?:\[[\s\S]*?\]\s*)?>\s*", re.IGNORECASE)
-CENTERED_TEXT_NODE_RE = re.compile(
-    r"(\\node\[)([^\]]*\banchor=)south"
-    r"(\b[^\]]*\]\s*\(drawio2tikzcenter\d+line\d+\))",
-)
 DEFAULT_DRAWIO_BIN = environ.get("DRAWIO_BIN", "drawio")
 DRAWIO_EXPORT_TIMEOUT_SECONDS = float(environ.get("DRAWIO_EXPORT_TIMEOUT_SECONDS", "120"))
 MAX_PAGE_COUNT = int(environ.get("DRAWIO2TIKZ_MAX_PAGE_COUNT", "50"))
@@ -166,39 +158,19 @@ def _run_drawio_export(options: ConvertOptions, page_index: int, raw_svg: Path) 
 
 def _convert_svg_source(svg_source: str, options: ConvertOptions) -> str:
     """Convert SVG source to TikZ code."""
-    # svg2tikz exposes a library API, but internally it still calls
-    # argparse.parse_args(). Isolate it from drawio2tikz's CLI arguments.
-    with _isolated_argv():
-        result: str = convert_svg(
-            _strip_xml_prolog(svg_source),
-            no_output=True,
-            returnstring=True,
-            codeoutput="figonly",
-            output_unit=options.output_unit,
-            texmode=options.texmode,
-            markings=options.markings,
-            arrow="stealth",
-            scale=options.scale,
-            round_number=options.round_number,
-        )
-        return CENTERED_TEXT_NODE_RE.sub(r"\1\2center\3", result)
+    return convert_svg_to_tikz(
+        _strip_xml_prolog(svg_source),
+        output_unit=options.output_unit,
+        texmode=options.texmode,
+        scale=options.scale,
+        round_number=options.round_number,
+    )
 
 
 def _strip_xml_prolog(svg_source: str) -> str:
     """Strip XML declaration and DOCTYPE from SVG source."""
     svg_source = XML_DECL_RE.sub("", svg_source, count=1)
     return DOCTYPE_RE.sub("", svg_source, count=1)
-
-
-@contextmanager
-def _isolated_argv() -> Generator[None]:
-    """Context manager to isolate sys.argv for svg2tikz."""
-    original = sys.argv
-    sys.argv = ["drawio2tikz-svg2tikz"]
-    try:
-        yield
-    finally:
-        sys.argv = original
 
 
 def _default_output_path(
@@ -222,6 +194,6 @@ def _default_output_path(
 def _source_comment(input_path: Path, page_index: int) -> str:
     """Generate LaTeX comment with conversion metadata."""
     return (
-        f"% Generated from {input_path} page {page_index} via drawio SVG and svg2tikz.\n"
+        f"% Generated from {input_path} page {page_index} via drawio SVG.\n"
         "% The intermediate SVG was sanitized by drawio2tikz.\n"
     )

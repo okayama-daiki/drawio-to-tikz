@@ -124,9 +124,8 @@ def _text_svg_for_label(
         node_id_prefix = f"drawio2tikzlabel{label_serial}line"
     else:
         first_y = vertical_center - (len(label.lines) - 1) * line_height / 2
-        # svg2tikz interprets SVG's y coordinate as the south edge of a TeX
-        # node.  Mark labels whose y coordinate is a true visual center so the
-        # converter can replace that vertical anchor after SVG conversion.
+        # Mark labels whose SVG Y coordinate is a true visual center so the
+        # native TikZ renderer can use a center anchor rather than a baseline.
         node_id_prefix = f"drawio2tikzcenter{label_serial}line"
 
     text_nodes: list[str] = []

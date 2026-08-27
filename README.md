@@ -1,6 +1,6 @@
 # drawio2tikz
 
-`drawio2tikz` is a thin wrapper around [`svg2tikz`](https://github.com/xyz2tex/svg2tikz) that converts draw.io diagrams to TikZ code for embedding in LaTeX documents.
+`drawio2tikz` converts draw.io diagrams to TikZ code for embedding in LaTeX documents.
 
 ## Features
 
@@ -8,7 +8,7 @@
 - Converts multiple draw.io files from the web UI
 - Preserves label colors, bold text, font sizes, and simple line breaks
 - **Ignores draw.io font family names**, allowing output to use the host LaTeX document font
-- Removes draw.io SVG CSS that `svg2tikz` cannot parse, including `light-dark(...)` from draw.io's dark mode color scheme
+- Removes draw.io SVG CSS that cannot be represented in TikZ, including `light-dark(...)` from draw.io's dark mode color scheme
 - Restores draw.io labels emitted as SVG `foreignObject` elements, which draw.io exports as HTML fragments
 
 ## Requirements
@@ -37,7 +37,7 @@ pip install drawio2tikz
 Clone the repository and install in development mode:
 
 ```bash
-git clone https://github.com/daikiokayama/drawio2tikz.git
+git clone https://github.com/okayama-daiki/drawio2tikz.git
 cd drawio2tikz
 uv sync
 uv run drawio2tikz --help
@@ -211,7 +211,7 @@ For support of arbitrary large font sizes, use a scalable font:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open issues or submit pull requests on [GitHub](https://github.com/daikiokayama/drawio2tikz).
+Contributions are welcome! Please feel free to open issues or submit pull requests on [GitHub](https://github.com/okayama-daiki/drawio2tikz).
 
 ## License
 

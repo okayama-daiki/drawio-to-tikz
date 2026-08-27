@@ -1525,7 +1525,7 @@ HTML_PAGE = """<!doctype html>
 
       submitButton.disabled = true;
       submitButton.textContent = "Converting...";
-      setStatus("Running draw.io export and svg2tikz...");
+      setStatus("Running draw.io export and TikZ conversion...");
       resetResult();
 
       const body = new FormData(form);
