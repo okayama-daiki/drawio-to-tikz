@@ -4,6 +4,12 @@ on:
     push:
         tags:
             - "v[0-9]+.[0-9]+.[0-9]+"
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: Existing vMAJOR.MINOR.PATCH tag to publish
+                required: true
+                type: string
 
 permissions: {}
 
@@ -15,29 +21,44 @@ jobs:
             id-token: write
 
         env:
-            VERSION: ${{ github.ref_name }}
+            VERSION: ${{ inputs.tag || github.ref_name }}
 
         steps:
+            - name: Validate release tag
+              run: |
+                  if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "Invalid release tag: ${VERSION}" >&2
+                      exit 1
+                  fi
+
             - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
               with:
                   persist-credentials: false
+                  ref: ${{ env.VERSION }}
 
             - name: Install uv
               uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+              with:
+                  enable-cache: false
+
+            - name: Verify package version
+              run: test "${VERSION#v}" = "$(uv version --short)"
 
             - name: Build release distributions
               run: uv build
 
-            - name: Create GitHub Release
-              uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
-              with:
-                  tag_name: ${{ env.VERSION }}
-                  files: dist/*
-                  generate_release_notes: true
+            - name: Publish GitHub Release
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  if gh release view "${VERSION}" >/dev/null 2>&1; then
+                      gh release upload "${VERSION}" dist/*.whl dist/*.tar.gz --clobber
+                  else
+                      gh release create "${VERSION}" dist/*.whl dist/*.tar.gz \
+                          --generate-notes --verify-tag
+                  fi
 
             - name: Publish release distributions to PyPI
-              uses: pypa/gh-action-pypi-publish@ec4db0b4ddc65acdf4bff5fa45ac92d78b56bdf0 # v1.9.0
+              uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
               with:
                   packages-dir: dist/
